@@ -1,0 +1,363 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ROYAL SPICE | Admin Dashboard</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#090909;color:#fff;font-family:Arial,sans-serif}
+header{padding:24px 18px;background:#17130c;border-bottom:1px solid #b99545}
+h1{color:#dfbd67;letter-spacing:3px;margin:0}
+header p{color:#aaa}
+main{max-width:1100px;margin:auto;padding:18px}
+h2{color:#dfbd67;margin-top:30px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.card,.panel{background:#181818;border:1px solid #705a2e;border-radius:12px;padding:17px}
+.card small{color:#aaa}
+.card h3{font-size:23px;color:#e6c36a;margin:12px 0 0}
+input,select{width:100%;padding:12px;background:#222;color:white;border:1px solid #806936;border-radius:7px;margin:8px 0}
+button{background:#c49a42;color:#111;border:0;padding:11px 14px;border-radius:7px;font-weight:bold;margin:5px 3px;cursor:pointer}
+button.danger{background:#922f2f;color:white}
+.order,.menu-item{border-bottom:1px solid #444;padding:15px 0}
+.status{color:#e5bd61}
+.note{font-size:12px;color:#aaa;line-height:1.5}
+.muted{color:#aaa}
+@media(min-width:700px){.grid{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+
+<header>
+<h1>ROYAL SPICE</h1>
+<p>Premium Restaurant Owner Dashboard</p>
+</header>
+
+<main>
+
+<h2>Business Overview</h2>
+<div class="grid">
+<div class="card"><small>Total Orders</small><h3 id="total">0</h3></div>
+<div class="card"><small>Completed Orders</small><h3 id="completed">0</h3></div>
+<div class="card"><small>Total Revenue</small><h3 id="revenue">₹0</h3></div>
+<div class="card"><small>Payment Received</small><h3 id="received">₹0</h3></div>
+<div class="card"><small>Payment Pending</small><h3 id="pending">₹0</h3></div>
+<div class="card"><small>Pending Payments</small><h3 id="pendingCount">0</h3></div>
+</div>
+
+<h2>Payment Summary</h2>
+<div class="grid">
+<div class="card"><small>Cash Received</small><h3 id="cash">₹0</h3></div>
+<div class="card"><small>UPI Received</small><h3 id="upi">₹0</h3></div>
+</div>
+
+<h2>Kitchen & Order Management</h2>
+<div class="panel">
+<div id="orders">No orders available yet.</div>
+</div>
+
+<h2>Menu Management</h2>
+<div class="panel">
+<p class="muted">Add and manage your restaurant food items.</p>
+<input id="itemName" placeholder="Food item name">
+<input id="itemPrice" type="number" min="1" placeholder="Price in ₹">
+<button id="addMenu">Add Menu Item</button>
+<p id="menuMessage" class="status"></p>
+<div id="menuList">Connecting to Firebase...</div>
+</div>
+
+<h2>Payment Settings</h2>
+<div class="panel">
+<p>Restaurant UPI ID</p>
+<input id="upiId" placeholder="yourname@upi">
+<button id="saveUPI">Save UPI ID</button>
+<p id="upiMessage" class="status"></p>
+<p class="note">Demo mode: Verify real UPI payments before marking orders as paid.</p>
+</div>
+
+<h2>Table Management</h2>
+<div class="panel">
+<input id="tables" type="number" min="1" placeholder="Number of restaurant tables">
+<button id="saveTables">Save Tables</button>
+<p id="tableMessage" class="status"></p>
+</div>
+
+<p class="note">ROYAL SPICE Admin Dashboard | Firebase Menu Database</p>
+</main>
+
+<script>
+function getOrders(){
+  try {
+    return JSON.parse(localStorage.getItem("royalOrders") || "[]");
+  } catch(e) {
+    return [];
+  }
+}
+
+function amount(o){
+  return Number(o.total || 0);
+}
+
+function paid(o){
+  return o.paymentStatus === "Paid";
+}
+
+function method(o){
+  return String(o.paymentMethod || "").toLowerCase();
+}
+
+function update(){
+  const a = getOrders();
+  const received = a.filter(paid);
+  const pending = a.filter(o => !paid(o));
+  const sum = list => list.reduce((s,o) => s + amount(o),0);
+
+  document.getElementById("total").textContent = a.length;
+  document.getElementById("completed").textContent =
+    a.filter(o => o.status === "Completed").length;
+  document.getElementById("revenue").textContent = "₹" + sum(a);
+  document.getElementById("received").textContent = "₹" + sum(received);
+  document.getElementById("pending").textContent = "₹" + sum(pending);
+  document.getElementById("pendingCount").textContent = pending.length;
+  document.getElementById("cash").textContent =
+    "₹" + sum(received.filter(o => method(o) === "cash"));
+  document.getElementById("upi").textContent =
+    "₹" + sum(received.filter(o => method(o) === "upi"));
+
+  const box = document.getElementById("orders");
+  box.innerHTML = "";
+
+  if(!a.length){
+    box.textContent = "No orders available yet.";
+    return;
+  }
+
+  a.forEach((o,i) => {
+    const div = document.createElement("div");
+    div.className = "order";
+
+    const title = document.createElement("strong");
+    title.textContent = "Order #" + (i+1) + " | " + (o.status || "Pending");
+
+    const detail = document.createElement("p");
+    detail.textContent = "Table: " + (o.table || "N/A") + " | Total: ₹" + amount(o);
+
+    const payment = document.createElement("p");
+    payment.className = "status";
+    payment.textContent = "Payment: " + (o.paymentStatus || "Pending") +
+      " | Method: " + (o.paymentMethod || "Not selected");
+
+    div.append(title,detail,payment);
+
+    if(!paid(o)){
+      const select = document.createElement("select");
+
+      ["Cash","UPI"].forEach(v => {
+        const option = document.createElement("option");
+        option.value = v;
+        option.textContent = v;
+        select.appendChild(option);
+      });
+
+      select.value = o.paymentMethod || "Cash";
+
+      const btn = document.createElement("button");
+      btn.textContent = "Mark Payment Received";
+
+      btn.onclick = () => {
+        const orders = getOrders();
+        if(!orders[i]) return;
+        orders[i].paymentMethod = select.value;
+        orders[i].paymentStatus = "Paid";
+        localStorage.setItem("royalOrders",JSON.stringify(orders));
+        update();
+      };
+
+      div.append(select,btn);
+    }
+
+    box.appendChild(div);
+  });
+}
+
+document.getElementById("upiId").value =
+  localStorage.getItem("royalUPI") || "";
+
+document.getElementById("tables").value =
+  localStorage.getItem("royalTableCount") || "";
+
+document.getElementById("saveUPI").onclick = () => {
+  const id = document.getElementById("upiId").value.trim();
+
+  if(id && !/^[\w.-]+@[\w.-]+$/.test(id)){
+    alert("Enter a valid UPI ID");
+    return;
+  }
+
+  localStorage.setItem("royalUPI",id);
+  document.getElementById("upiMessage").textContent =
+    id ? "UPI ID saved." : "UPI ID cleared.";
+};
+
+document.getElementById("saveTables").onclick = () => {
+  const n = Number(document.getElementById("tables").value);
+
+  if(!Number.isInteger(n) || n < 1){
+    alert("Enter a valid table count");
+    return;
+  }
+
+  localStorage.setItem("royalTableCount",n);
+  document.getElementById("tableMessage").textContent =
+    n + " tables saved on this device.";
+};
+
+update();
+</script>
+
+<script type="module">
+import { initializeApp } from
+  "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  updateDoc,
+  deleteDoc,
+  doc,
+  onSnapshot
+} from
+  "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD4blpjNT4dub3-SuYvPc7yZqmJCipzW3E",
+  authDomain: "royal-spice-qr-dining-56344.firebaseapp.com",
+  projectId: "royal-spice-qr-dining-56344",
+  storageBucket: "royal-spice-qr-dining-56344.firebasestorage.app",
+  messagingSenderId: "928416090477",
+  appId: "1:928416090477:web:034921c8b023c1a5d03264"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const menuRef = collection(db,"menu");
+
+const list = document.getElementById("menuList");
+const message = document.getElementById("menuMessage");
+
+function showError(error){
+  console.error(error);
+  message.textContent = "Firebase error: " + error.message;
+}
+
+function renderMenu(snapshot){
+  list.innerHTML = "";
+
+  if(snapshot.empty){
+    list.textContent = "No menu items yet.";
+    return;
+  }
+
+  snapshot.forEach(item => {
+    const data = item.data();
+    const div = document.createElement("div");
+    div.className = "menu-item";
+
+    const name = document.createElement("strong");
+    name.textContent = data.itemName || data.name || "Unnamed item";
+
+    const price = document.createElement("p");
+    price.textContent = "Price: ₹" + Number(data.price || 0);
+
+    const status = document.createElement("p");
+    status.className = "status";
+    status.textContent = data.available ? "Available" : "Out of Stock";
+
+    const toggle = document.createElement("button");
+    toggle.textContent = data.available ? "Mark Out of Stock" : "Make Available";
+
+    toggle.onclick = async () => {
+      try {
+        await updateDoc(doc(db,"menu",item.id),{
+          available: !data.available
+        });
+      } catch(error){
+        showError(error);
+      }
+    };
+
+    const edit = document.createElement("button");
+    edit.textContent = "Edit Price";
+
+    edit.onclick = async () => {
+      const value = prompt("Enter new price:",data.price || 0);
+      if(value === null) return;
+
+      const priceValue = Number(value);
+      if(!Number.isFinite(priceValue) || priceValue <= 0){
+        alert("Enter a valid price.");
+        return;
+      }
+
+      try {
+        await updateDoc(doc(db,"menu",item.id),{
+          price: priceValue
+        });
+        message.textContent = "Price updated.";
+      } catch(error){
+        showError(error);
+      }
+    };
+
+    const remove = document.createElement("button");
+    remove.className = "danger";
+    remove.textContent = "Delete";
+
+    remove.onclick = async () => {
+      if(!confirm("Delete this menu item?")) return;
+
+      try {
+        await deleteDoc(doc(db,"menu",item.id));
+        message.textContent = "Menu item deleted.";
+      } catch(error){
+        showError(error);
+      }
+    };
+
+    div.append(name,price,status,toggle,edit,remove);
+    list.appendChild(div);
+  });
+}
+
+onSnapshot(menuRef,renderMenu,showError);
+
+document.getElementById("addMenu").onclick = async () => {
+  const name = document.getElementById("itemName").value.trim();
+  const price = Number(document.getElementById("itemPrice").value);
+
+  if(!name || !Number.isFinite(price) || price <= 0){
+    message.textContent = "Enter a valid food name and price.";
+    return;
+  }
+
+  try {
+    await addDoc(menuRef,{
+      itemName: name,
+      price: price,
+      available: true
+    });
+
+    document.getElementById("itemName").value = "";
+    document.getElementById("itemPrice").value = "";
+    message.textContent = "Menu item added successfully!";
+  } catch(error){
+    showError(error);
+  }
+};
+</script>
+
+</body>
+</html>
