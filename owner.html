@@ -3,100 +3,144 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ROYAL SPICE | Owner Dashboard</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ROYAL SPICE | Admin</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#090909;color:#fff;font-family:Arial,sans-serif}
-header{background:#15120d;border-bottom:1px solid #b99545;padding:22px}
-h1{color:#d6b45c;letter-spacing:3px}
-header p{color:#aaa;margin-top:7px}
-main{padding:20px;max-width:1100px;margin:auto}
-h2{color:#d6b45c;margin:20px 0}
-.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-.card{background:#171717;border:1px solid #705a2e;border-radius:12px;padding:20px}
+*{box-sizing:border-box}
+body{margin:0;background:#090909;color:#fff;font-family:Arial}
+header{padding:22px;background:#17130c;border-bottom:1px solid #b99545}
+h1{color:#dfbd67;letter-spacing:3px;margin:0}
+header p{color:#aaa}
+main{max-width:1100px;margin:auto;padding:18px}
+h2{color:#dfbd67;margin-top:28px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.card,.panel{background:#181818;border:1px solid #705a2e;border-radius:12px;padding:17px}
 .card small{color:#aaa}
-.card h3{color:#e6c36a;font-size:25px;margin-top:12px}
-.panel{background:#171717;border:1px solid #705a2e;border-radius:12px;padding:18px;margin-top:16px}
-button{background:#c49a42;color:#111;border:0;padding:12px 16px;border-radius:7px;font-weight:bold;cursor:pointer;margin-top:12px}
-input{background:#222;color:white;border:1px solid #806936;padding:12px;width:100%;border-radius:7px;margin-top:10px}
+.card h3{font-size:23px;color:#e6c36a;margin:12px 0 0}
+input,select{width:100%;padding:12px;background:#222;color:white;border:1px solid #806936;border-radius:7px;margin:8px 0}
+button{background:#c49a42;color:#111;border:0;padding:11px 14px;border-radius:7px;font-weight:bold;margin:5px 3px;cursor:pointer}
 .order{border-bottom:1px solid #444;padding:15px 0}
-.status{color:#e5bd61;margin-top:6px}
-@media(min-width:700px){.stats{grid-template-columns:repeat(4,1fr)}}
+.status{color:#e5bd61}
+.note{font-size:12px;color:#aaa;line-height:1.5}
+@media(min-width:700px){.grid{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
 <body>
 <header>
 <h1>ROYAL SPICE</h1>
-<p>Restaurant Owner Dashboard</p>
+<p>Premium Restaurant Owner Dashboard</p>
 </header>
 <main>
 <h2>Business Overview</h2>
-<div class="stats">
+<div class="grid">
 <div class="card"><small>Total Orders</small><h3 id="total">0</h3></div>
-<div class="card"><small>Pending Orders</small><h3 id="pending">0</h3></div>
 <div class="card"><small>Completed Orders</small><h3 id="completed">0</h3></div>
-<div class="card"><small>Today's Sales</small><h3 id="sales">₹0</h3></div>
+<div class="card"><small>Total Revenue</small><h3 id="revenue">₹0</h3></div>
+<div class="card"><small>Payment Received</small><h3 id="received">₹0</h3></div>
+<div class="card"><small>Payment Pending</small><h3 id="pending">₹0</h3></div>
+<div class="card"><small>Pending Payments</small><h3 id="pendingCount">0</h3></div>
 </div>
 
-<h2>Kitchen Order Management</h2>
+<h2>Payment Summary</h2>
+<div class="grid">
+<div class="card"><small>Cash Received</small><h3 id="cash">₹0</h3></div>
+<div class="card"><small>UPI Received</small><h3 id="upi">₹0</h3></div>
+</div>
+
+<h2>Kitchen & Order Management</h2>
 <div class="panel">
 <div id="orders">No orders available yet.</div>
 </div>
 
-<h2>Quick Table Management</h2>
+<h2>Payment Settings</h2>
 <div class="panel">
-<p>Restaurant tables</p>
-<input id="tables" type="number" min="1" placeholder="Enter number of tables">
-<button onclick="saveTables()">Save Tables</button>
-<p id="tableResult" class="status"></p>
+<p>UPI ID (add actual restaurant UPI ID later)</p>
+<input id="upiId" placeholder="yourname@upi">
+<button onclick="saveUPI()">Save UPI ID</button>
+<p id="upiMessage" class="status"></p>
+<p class="note">Demo mode: UPI payment is not processed here. Verify real UPI payments before marking them paid.</p>
 </div>
-<p style="color:#777;text-align:center;margin:30px 0">
-ROYAL SPICE · PREMIUM DINING PLATFORM
-</p>
+
+<h2>Table Management</h2>
+<div class="panel">
+<input id="tables" type="number" min="1" placeholder="Number of restaurant tables">
+<button onclick="saveTables()">Save Tables</button>
+<p id="tableMessage" class="status"></p>
+</div>
 </main>
+
 <script>
 function getOrders(){
 try{return JSON.parse(localStorage.getItem("royalOrders")||"[]")}
 catch(e){return []}
 }
+function amount(o){return Number(o.total||0)}
+function paid(o){return o.paymentStatus==="Paid"}
+function method(o){return String(o.paymentMethod||"").toLowerCase()}
 function update(){
-let orders=getOrders();
-document.getElementById("total").textContent=orders.length;
-document.getElementById("pending").textContent=orders.filter(o=>o.status!=="Completed").length;
-document.getElementById("completed").textContent=orders.filter(o=>o.status==="Completed").length;
-let sales=orders.filter(o=>o.status==="Completed").reduce((s,o)=>s+Number(o.total||0),0);
-document.getElementById("sales").textContent="₹"+sales;
+let a=getOrders();
+let received=a.filter(paid);
+let pending=a.filter(o=>!paid(o));
+let sum=list=>list.reduce((s,o)=>s+amount(o),0);
+document.getElementById("total").textContent=a.length;
+document.getElementById("completed").textContent=a.filter(o=>o.status==="Completed").length;
+document.getElementById("revenue").textContent="₹"+sum(a);
+document.getElementById("received").textContent="₹"+sum(received);
+document.getElementById("pending").textContent="₹"+sum(pending);
+document.getElementById("pendingCount").textContent=pending.length;
+document.getElementById("cash").textContent="₹"+sum(received.filter(o=>method(o)==="cash"));
+document.getElementById("upi").textContent="₹"+sum(received.filter(o=>method(o)==="upi"));
 let box=document.getElementById("orders");
-if(!orders.length){box.textContent="No orders available yet.";return}
 box.innerHTML="";
-orders.forEach((o,i)=>{
+if(!a.length){box.textContent="No orders available yet.";return}
+a.forEach((o,i)=>{
 let div=document.createElement("div");
 div.className="order";
 let title=document.createElement("strong");
-title.textContent="Order #"+(i+1)+" - "+(o.status||"Pending");
+title.textContent="Order #"+(i+1)+" | "+(o.status||"Pending");
 let detail=document.createElement("p");
-detail.textContent="Table: "+(o.table||"N/A")+" | Total: ₹"+Number(o.total||0);
+detail.textContent="Table: "+(o.table||"N/A")+" | Total: ₹"+amount(o);
+let payment=document.createElement("p");
+payment.className="status";
+payment.textContent="Payment: "+(o.paymentStatus||"Pending")+" | Method: "+(o.paymentMethod||"Not selected");
+div.append(title,detail,payment);
+if(!paid(o)){
+let select=document.createElement("select");
+["Cash","UPI"].forEach(v=>{
+let option=document.createElement("option");
+option.value=v;option.textContent=v;
+select.appendChild(option);
+});
+select.value=o.paymentMethod||"Cash";
 let btn=document.createElement("button");
-btn.textContent=o.status==="Completed"?"Completed":"Mark Completed";
-btn.disabled=o.status==="Completed";
+btn.textContent="Mark Payment Received";
 btn.onclick=()=>{
-orders[i].status="Completed";
+let orders=getOrders();
+orders[i].paymentMethod=select.value;
+orders[i].paymentStatus="Paid";
 localStorage.setItem("royalOrders",JSON.stringify(orders));
 update();
 };
-div.append(title,detail,btn);
+div.append(select,btn);
+}
 box.appendChild(div);
 });
+}
+function saveUPI(){
+let id=document.getElementById("upiId").value.trim();
+if(id&&!/^[\w.-]+@[\w.-]+$/.test(id)){alert("Enter a valid UPI ID");return}
+localStorage.setItem("royalUPI",id);
+document.getElementById("upiMessage").textContent=id?"UPI ID saved.":"UPI ID cleared.";
 }
 function saveTables(){
 let n=Number(document.getElementById("tables").value);
 if(!Number.isInteger(n)||n<1){alert("Enter a valid table count");return}
 localStorage.setItem("royalTableCount",n);
-document.getElementById("tableResult").textContent=n+" tables saved on this device.";
+document.getElementById("tableMessage").textContent=n+" tables saved on this device.";
 }
-update();
+document.getElementById("upiId").value=localStorage.getItem("royalUPI")||"";
 document.getElementById("tables").value=localStorage.getItem("royalTableCount")||"";
+update();
 </script>
 </body>
 </html>
