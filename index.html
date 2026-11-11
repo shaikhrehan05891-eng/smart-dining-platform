@@ -186,4 +186,21 @@ function bars(){const v=st.view,n=cnt();$("bar").innerHTML=(v==="menu"&&n)?`<but
 addEventListener("storage",e=>{if(e.key===KEY){try{DB=JSON.parse(e.newValue)}catch(x){}if(st.view!=="menu"&&st.view!=="cart")draw()}});
 addEventListener("hashchange",()=>{st.view=location.hash==="#staff"?"staff":"menu";draw()});
 draw();
-</script></body></html>
+</script></body></html> 
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyD4blpjNT4dub3-SuYvPc7yZqmJCipzW3E",
+  authDomain: "royal-spice-qr-dining-56344.firebaseapp.com",
+  projectId: "royal-spice-qr-dining-56344",
+  storageBucket: "royal-spice-qr-dining-56344.firebasestorage.app",
+  messagingSenderId: "928416090477",
+  appId: "1:928416090477:web:034921c8b023c1a5d03264"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
