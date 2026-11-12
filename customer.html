@@ -1,0 +1,265 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ROYAL SPICE | Customer Menu</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#090909;color:white;
+ font-family:Arial,sans-serif;
+}
+header{
+ background:#17130c;text-align:center;
+ padding:25px;border-bottom:1px solid #c49a42;
+}
+h1{color:#dfbd67;letter-spacing:3px;margin:0}
+header p{color:#aaa}
+main{max-width:700px;margin:auto;padding:18px}
+h2{color:#dfbd67}
+.panel,.food{
+ background:#181818;border:1px solid #705a2e;
+ border-radius:12px;padding:16px;margin-bottom:14px;
+}
+.food{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.food p{color:#dfbd67}
+button{
+ background:#c49a42;color:#111;border:0;
+ border-radius:7px;padding:11px 14px;
+ font-weight:bold;cursor:pointer;
+}
+input{
+ width:100%;padding:13px;background:#222;
+ color:white;border:1px solid #806936;
+ border-radius:7px;margin:8px 0;
+}
+.qty{display:flex;align-items:center;gap:10px}
+.muted{color:#aaa}
+#message{color:#dfbd67}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>ROYAL SPICE</h1>
+<p>Premium Dining Experience</p>
+</header>
+
+<main>
+
+<h2>Our Menu</h2>
+<p class="muted">Choose your favourite food.</p>
+
+<div id="menu">Loading menu...</div>
+
+<h2>Your Cart</h2>
+<div class="panel">
+<div id="cart">Your cart is empty.</div>
+<h3 id="total">Total: ₹0</h3>
+</div>
+
+<h2>Place Your Order</h2>
+<div class="panel">
+
+<label>Table Number</label>
+<input id="table" type="number" min="1" placeholder="Enter table number">
+
+<button id="placeOrder">Place Order</button>
+
+<p id="message"></p>
+</div>
+
+</main>
+
+<script type="module">
+
+import {initializeApp} from
+"https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+
+import {
+ getFirestore,collection,getDocs,addDoc,
+ serverTimestamp
+} from
+"https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+
+const firebaseConfig = {
+ apiKey:"AIzaSyD4blpjNT4dub3-SuYvPc7yZqmJCipzW3E",
+ authDomain:"royal-spice-qr-dining-56344.firebaseapp.com",
+ projectId:"royal-spice-qr-dining-56344",
+ storageBucket:"royal-spice-qr-dining-56344.firebasestorage.app",
+ messagingSenderId:"928416090477",
+ appId:"1:928416090477:web:034921c8b023c1a5d03264"
+};
+
+const app=initializeApp(firebaseConfig);
+const db=getFirestore(app);
+
+const menuBox=document.getElementById("menu");
+const cartBox=document.getElementById("cart");
+const totalBox=document.getElementById("total");
+const message=document.getElementById("message");
+
+let menuItems=[];
+let cart={};
+
+async function loadMenu(){
+ try{
+  const snap=await getDocs(collection(db,"Menu"));
+  menuItems=[];
+
+  snap.forEach(d=>{
+   const data=d.data();
+   if(data.available===true){
+    menuItems.push({
+     id:d.id,
+     name:data.itemName || data.name || "Food Item",
+     price:Number(data.price || 0)
+    });
+   }
+  });
+
+  renderMenu();
+
+ }catch(e){
+  menuBox.textContent="Menu loading error: "+e.message;
+ }
+}
+
+function renderMenu(){
+ menuBox.innerHTML="";
+
+ if(!menuItems.length){
+  menuBox.textContent="No food items available.";
+  return;
+ }
+
+ menuItems.forEach(item=>{
+  const div=document.createElement("div");
+  div.className="food";
+
+  const info=document.createElement("div");
+  const name=document.createElement("strong");
+  name.textContent=item.name;
+
+  const price=document.createElement("p");
+  price.textContent="₹"+item.price;
+
+  info.append(name,price);
+
+  const btn=document.createElement("button");
+  btn.textContent="Add +";
+  btn.onclick=()=>{
+   cart[item.id]=(cart[item.id]||0)+1;
+   renderCart();
+  };
+
+  div.append(info,btn);
+  menuBox.appendChild(div);
+ });
+}
+
+function renderCart(){
+ cartBox.innerHTML="";
+ let total=0;
+
+ Object.keys(cart).forEach(id=>{
+  const item=menuItems.find(x=>x.id===id);
+  if(!item)return;
+
+  const qty=cart[id];
+  total+=item.price*qty;
+
+  const row=document.createElement("div");
+  row.className="food";
+
+  const info=document.createElement("span");
+  info.textContent=item.name+" × "+qty;
+
+  const controls=document.createElement("div");
+  controls.className="qty";
+
+  const minus=document.createElement("button");
+  minus.textContent="-";
+  minus.onclick=()=>{
+   cart[id]--;
+   if(cart[id]<=0)delete cart[id];
+   renderCart();
+  };
+
+  const plus=document.createElement("button");
+  plus.textContent="+";
+  plus.onclick=()=>{
+   cart[id]++;
+   renderCart();
+  };
+
+  controls.append(minus,plus);
+  row.append(info,controls);
+  cartBox.appendChild(row);
+ });
+
+ if(!Object.keys(cart).length){
+  cartBox.textContent="Your cart is empty.";
+ }
+
+ totalBox.textContent="Total: ₹"+total;
+}
+
+document.getElementById("placeOrder").onclick=async()=>{
+ try{
+  const table=Number(document.getElementById("table").value);
+
+  if(!Number.isInteger(table)||table<1){
+   message.textContent="Enter a valid table number.";
+   return;
+  }
+
+  const items=Object.keys(cart).map(id=>{
+   const item=menuItems.find(x=>x.id===id);
+   if(!item)throw new Error("Menu item unavailable.");
+   return {
+    itemId:id,
+    itemName:item.name,
+    price:item.price,
+    quantity:cart[id]
+   };
+  });
+
+  if(!items.length){
+   message.textContent="Please add food to your cart.";
+   return;
+  }
+
+  const total=items.reduce(
+   (sum,item)=>sum+item.price*item.quantity,0
+  );
+
+  await addDoc(collection(db,"orders"),{
+   table:table,
+   items:items,
+   total:total,
+   status:"Pending",
+   paymentStatus:"Pending",
+   paymentMethod:"",
+   createdAt:serverTimestamp()
+  });
+
+  cart={};
+  renderCart();
+  document.getElementById("table").value="";
+  message.textContent="Order placed successfully! Thank you.";
+
+ }catch(e){
+  message.textContent="Order error: "+e.message;
+ }
+};
+
+loadMenu();
+
+</script>
+</body>
+</html>
